@@ -31,7 +31,7 @@
           title="历史记录" 
           is-link 
           :icon="'history'"
-          @click="showToast('功能开发中')"
+          @click="goHistory"
         />
         <van-cell 
           title="设置" 
@@ -76,7 +76,10 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
+
+const router = useRouter()
 
 // 用户信息
 const userAvatar = 'https://img.yzcdn.cn/vant/cat.jpeg'
@@ -84,6 +87,11 @@ const userName = '游客'
 
 // 对话框状态
 const aboutDialogVisible = ref(false)
+
+// 进入历史记录页
+const goHistory = () => {
+  router.push('/history')
+}
 
 // 显示关于我们对话框
 const showAboutDialog = () => {
