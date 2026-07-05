@@ -25,7 +25,7 @@
                 <div class="card overview_card">
                   <div class="trip-header">
                     <h2>{{ formData.city }}·{{ formData.days }}天行程</h2>
-                    <div class="trip-budget">预算：{{ formData.budget }}元</div>
+                    <div class="trip-budget">预算：¥{{ formData.budget }}</div>
                   </div>
                 </div>
                 <van-collapse v-model="activeDays">
@@ -88,8 +88,9 @@ import { useRoute , useRouter} from 'vue-router'
 import { post } from '../utils/request'
 import SpotItem from '../components/SpotItem.vue'
 import BudgetTable from '../components/BudgetTable.vue'
+import { useTripStore } from '../stores/trip'
 
-
+const tripStore = useTripStore()
 
 const route = useRoute()
 const router = useRouter()
@@ -117,6 +118,7 @@ const fetchTravelData=async()=>{
     })
     if(res && res.success != false){
       tripData.value = res
+      tripStore.setPlan(formData.city, formData.budget, formData.days, res)
     }else{
       errorMsg.value = '接口调用失败'
     }
@@ -133,7 +135,13 @@ onMounted(() => {
   formData.budget = route.query.budget
   formData.days = route.query.days
   if(formData.city && formData.budget && formData.days) {
-    fetchTravelData()
+    const cached = tripStore.getPlan(formData.city, formData.budget, formData.days)
+    if(cached){
+      tripData.value = cached
+      isLoading.value = false
+    }else{
+      fetchTravelData()
+    }
   }
 })
 

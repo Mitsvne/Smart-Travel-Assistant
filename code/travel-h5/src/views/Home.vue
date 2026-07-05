@@ -98,17 +98,15 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
+import { useTripStore } from '../stores/trip'
 // 路由实例
 const router = useRouter()
-// 旅游规划表单数据
-const formData = reactive({
-    city: '',
-    budget: null,
-    days: null
-})
+// 旅游规划表单数据（存于store，切页后保留）
+const tripStore = useTripStore()
+const formData = tripStore.form
 // 城市选择器显示状态
 const showCityPicker = ref(false)
 // 城市选择器数据

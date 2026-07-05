@@ -8,7 +8,7 @@
       </div>
       <div class="detail-row" v-if="data.ticket">
         <van-icon name="ticket-o" size="14" />
-        <span>{{ data.ticket }}</span>
+        <span>{{ formatTicket(data.ticket) }}</span>
       </div>
       <div class="detail-row" v-if="data.transportation">
         <van-icon name="logistics" size="14" />
@@ -23,6 +23,8 @@
 </template>
 
 <script setup>
+import { formatTicket } from '../utils/format'
+
 defineProps({
   data: {
     type: Object,

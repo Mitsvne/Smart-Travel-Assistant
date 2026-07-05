@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { formatAmount } from '../utils/format'
 
 const props = defineProps({
   data: {
@@ -50,12 +51,6 @@ const labelMap = {
 
 const getLabel = (key) => {
   return labelMap[key] || key
-}
-
-// 统一金额单位：提取数字部分并加 ¥，兼容 250 / "900日元" / "¥1498" 等格式
-const formatAmount = (val) => {
-  const num = parseFloat(String(val).replace(/[^\d.]/g, ''))
-  return isNaN(num) ? '¥0' : `¥${num}`
 }
 </script>
 

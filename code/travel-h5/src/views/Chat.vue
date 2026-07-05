@@ -45,8 +45,14 @@ import { useRouter, useRoute } from 'vue-router'
 import { fetchStream } from '../utils/request'
 import { showToast } from 'vant'
 import ChatBubble from '../components/ChatBubble.vue'
+import { useChatStore } from '../stores/chat'
+import { storeToRefs } from 'pinia'
 
 const router = useRouter()
+
+const chatStore = useChatStore()
+//对话数据（存于store，切页后保留）
+const { messages } = storeToRefs(chatStore)
 
 //聊天容器
 const chatContainer = ref(null)
@@ -73,8 +79,6 @@ const handleClickTag = (q) => {
 
 
 
-//对话数据
-const messages = ref([])
 //输入框内容
 const inputMessage = ref('')
 //AI处理中
@@ -184,7 +188,7 @@ onMounted(() => {
 }
 
 .chat-container {
-  height: 600px;
+  height: 550px;
   overflow-y: auto;
   padding: 16px;
   padding-bottom: 60px;
