@@ -110,6 +110,8 @@ class TravelService {
   "warnings": ["注意事项1", "注意事项2"]
 }
 
+注意：totalBudget 及 budgetBreakdown 中的所有金额字段（accommodation、food、transportation、tickets、other）必须是纯数字，单位统一为人民币元，不得包含 "¥"、"元"、"日元" 等任何货币符号或单位文字；且各项金额之和应等于 totalBudget。
+
 请确保JSON格式正确，可以被解析。`);
     }
 

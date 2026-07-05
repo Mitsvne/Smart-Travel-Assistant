@@ -159,64 +159,185 @@ const goToChat = () => {
 <style scoped>
 .page-container {
   min-height: 100vh;
-  background-color: #f5f5f5;
-  padding-bottom: 70px;
+  background-color: #f2f4f8;
+  padding-bottom: 80px;
 }
 
 .page-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  background-color: #fff;
   height: 46px;
+}
+
+/* 渐变导航栏 */
+:deep(.van-nav-bar) {
+  background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%);
+}
+:deep(.van-nav-bar)::after {
+  display: none;
+}
+:deep(.van-nav-bar__title),
+:deep(.van-nav-bar__text) {
+  color: #fff;
+}
+:deep(.van-nav-bar .van-icon) {
+  color: #fff;
 }
 
 .page-content {
   padding: 16px;
 }
 
-.common-button {
-  width: 100%;
-  height: 44px;
-  line-height: 44px;
-  font-size: 16px;
-  border-radius: 8px;
-}
-
-.primary-button {
-  background-color: #1989fa !important;
-  border: none !important;
-}
-
-.secondary-button {
-  background-color: #fff !important;
-  color: #1989fa !important;
-  border: 1px solid #1989fa !important;
-}
-
 .card {
   background-color: #fff;
-  border-radius: 8px;
+  border-radius: 16px;
   padding: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
+  box-shadow: 0 6px 20px rgba(31, 45, 61, 0.06);
+}
+
+/* 行程概览卡片：渐变风格 */
+.overview_card {
+  background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(25, 137, 250, 0.28);
+}
+.overview_card .trip-header h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+.overview_card .trip-budget {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  font-size: 14px;
 }
 
 .section-title {
-  font-size: 18px;
+  position: relative;
+  padding-left: 12px;
+  font-size: 17px;
   font-weight: 600;
   color: #323233;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+}
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #1989fa, #36cbcb);
 }
 
-.streaming-cursor {
+/* 行程折叠面板 */
+:deep(.van-collapse) {
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: 0 6px 20px rgba(31, 45, 61, 0.06);
+}
+:deep(.van-collapse-item__title) {
+  font-size: 16px;
+  font-weight: 600;
+  color: #323233;
+}
+
+.schedule-section {
+  margin-bottom: 16px;
+}
+.schedule-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-label {
   display: inline-block;
-  animation: blink 1s infinite;
+  padding: 2px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+.section-label.morning {
+  background: linear-gradient(135deg, #ff9a3c, #ffb84d);
+}
+.section-label.afternoon {
+  background: linear-gradient(135deg, #1989fa, #52a8ff);
+}
+.section-label.evening {
+  background: linear-gradient(135deg, #7c5cff, #9d7bff);
 }
 
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+/* 提示与注意事项列表 */
+ul.tips-list,
+ul.warnings-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tips-list li,
+.warnings-list li {
+  position: relative;
+  padding: 8px 0 8px 24px;
+  font-size: 14px;
+  color: #646566;
+  line-height: 1.6;
+  border-bottom: 1px solid #f2f4f8;
+}
+.tips-list li:last-child,
+.warnings-list li:last-child {
+  border-bottom: none;
+}
+.tips-list li::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 15px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1989fa;
+}
+.warnings-list li::before {
+  content: '!';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  background: #ff976a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 底部操作栏 */
+.detail-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 16px;
+  background: #fff;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  max-width: 750px;
+  margin: 0 auto;
+}
+
+.primary-button {
+  border: none !important;
+  background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%) !important;
+  box-shadow: 0 8px 18px rgba(25, 137, 250, 0.32);
 }
 
 .loading-container {

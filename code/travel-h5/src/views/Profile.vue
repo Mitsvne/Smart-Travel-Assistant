@@ -93,21 +93,37 @@ const showAboutDialog = () => {
 
 <style scoped>
 .profile-container {
-  padding-bottom: 50px;
+  min-height: 100vh;
+  padding-bottom: 70px;
+  background: #f2f4f8;
+}
+
+/* 导航栏与用户信息拼接成渐变头部 */
+:deep(.van-nav-bar) {
+  background: #1989fa;
+}
+:deep(.van-nav-bar)::after {
+  display: none;
+}
+:deep(.van-nav-bar__title) {
+  color: #fff;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  padding: 30px 20px;
+  padding: 24px 20px 32px;
   background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%);
   color: white;
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
 }
 
 .avatar {
   width: 80px;
   height: 80px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .user-details {
@@ -126,21 +142,47 @@ const showAboutDialog = () => {
 }
 
 .menu-section {
-  margin-top: 15px;
-  background-color: white;
-  border-radius: 12px;
-  margin: 15px 10px 0;
+  margin: 16px;
+  background-color: #fff;
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 6px 20px rgba(31, 45, 61, 0.06);
 }
 
 .menu-title {
-  font-size: 14px;
-  color: #646566;
-  padding: 12px 15px;
-  border-bottom: 1px solid #f0f0f0;
+  position: relative;
+  padding: 14px 16px 10px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #323233;
+}
+.menu-title::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 15px;
+  bottom: 11px;
+  width: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #1989fa, #36cbcb);
+}
+
+.menu-section :deep(.van-cell) {
+  align-items: center;
+  padding: 14px 16px;
+}
+.menu-section :deep(.van-cell__title) {
+  font-size: 15px;
+  color: #323233;
+}
+.menu-section :deep(.van-cell__left-icon) {
+  color: #1989fa;
+  font-size: 18px;
+  margin-right: 10px;
 }
 
 .about-content {
+  padding: 16px;
   text-align: center;
   line-height: 1.6;
 }

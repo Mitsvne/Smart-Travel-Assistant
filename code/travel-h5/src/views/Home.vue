@@ -227,7 +227,6 @@ const selectedCity = (city) => {
 /* 内容上移覆盖横幅 */
 .page-content {
 	position: relative;
-	z-index: 2;
 	margin-top: -36px;
 	padding: 16px;
 }

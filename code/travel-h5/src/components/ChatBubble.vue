@@ -61,15 +61,17 @@ const formatTime = computed(() => {
 }
 
 .user-message .bubble-content {
-  background: #1989fa;
+  background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%);
   color: #fff;
   border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 10px rgba(25, 137, 250, 0.25);
 }
 
 .ai-message .bubble-content {
-  background: #f5f5f5;
+  background: #fff;
   color: #323233;
   border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 8px rgba(31, 45, 61, 0.06);
 }
 
 .message-time {

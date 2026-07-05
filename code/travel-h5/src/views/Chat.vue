@@ -165,6 +165,22 @@ onMounted(() => {
   flex-direction: column;
   height: 100vh;
   padding-bottom: 0px !important;
+  background: #f2f4f8;
+}
+
+/* 渐变导航栏 */
+:deep(.van-nav-bar) {
+  background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%);
+}
+:deep(.van-nav-bar)::after {
+  display: none;
+}
+:deep(.van-nav-bar__title),
+:deep(.van-nav-bar__text) {
+  color: #fff;
+}
+:deep(.van-nav-bar .van-icon) {
+  color: #fff;
 }
 
 .chat-container {
@@ -189,12 +205,19 @@ onMounted(() => {
 
 .quick-title {
   font-size: 14px;
-  color: #999;
+  color: #969799;
   margin-bottom: 16px;
 }
 
 .quick-tag {
-  margin: 8px;
+  margin: 6px;
+  padding: 8px 16px !important;
+  border-radius: 20px !important;
+  background: #fff !important;
+  color: #1989fa !important;
+  font-size: 14px !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(31, 45, 61, 0.08);
   cursor: pointer;
 }
 
@@ -209,7 +232,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  color: #999;
+  color: #969799;
   font-size: 14px;
 }
 
@@ -226,9 +249,16 @@ onMounted(() => {
 }
 
 .chat-input-area :deep(.van-field) {
-  background: #f7f8fa;
+  background: #f2f4f8;
   border-radius: 20px;
   padding: 8px 16px;
+}
+
+.chat-input-area :deep(.van-button--primary) {
+  border: none;
+  border-radius: 16px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%);
 }
 </style>
 

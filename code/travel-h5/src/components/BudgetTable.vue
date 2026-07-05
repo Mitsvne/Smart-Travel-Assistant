@@ -5,13 +5,13 @@
         v-for="(value, key) in budgetItems"
         :key="key"
         :title="getLabel(key)"
-        :value="`¥${value}`"
+        :value="formatAmount(value)"
         :border="false"
       />
     </van-cell-group>
     <div class="budget-total">
       <span>总计</span>
-      <span class="total-amount">¥{{ total }}</span>
+      <span class="total-amount">{{ formatAmount(total) }}</span>
     </div>
   </div>
 </template>
@@ -50,6 +50,12 @@ const labelMap = {
 
 const getLabel = (key) => {
   return labelMap[key] || key
+}
+
+// 统一金额单位：提取数字部分并加 ¥，兼容 250 / "900日元" / "¥1498" 等格式
+const formatAmount = (val) => {
+  const num = parseFloat(String(val).replace(/[^\d.]/g, ''))
+  return isNaN(num) ? '¥0' : `¥${num}`
 }
 </script>
 
