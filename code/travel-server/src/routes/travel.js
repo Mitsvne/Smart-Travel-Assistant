@@ -18,14 +18,14 @@ router.post('/recommend', async (req, res) => {
 });
 
 router.post('/chat', async (req, res) => {
-    const { message } = req.body;
+    const { message, history } = req.body;
     if(!message){
         return res.status(400).json({success: false, message: '参数缺少',timestamp: new Date().toISOString()});
     }
     // 创建流式响应
     const stream = createStreamResponse(res);
-    // 调用大模型获取流式响应
-    const result = await travelService.chat(message,(chunk) => {
+    // 调用大模型获取流式响应（携带历史对话上下文）
+    const result = await travelService.chat(message, history, (chunk) => {
         stream.send({type: 'chunk',content: chunk});
     });
     stream.send({type: 'complete',data: result});

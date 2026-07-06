@@ -4,8 +4,39 @@
             <van-nav-bar title="AI旅游助手"
              left-arrow
              left-text="返回"
-              @click-left="onBack" />
+              @click-left="onBack">
+                <template #right>
+                    <van-icon name="notes-o" size="20" class="nav-action" @click="showHistory = true" />
+                    <van-icon name="plus" size="20" class="nav-action" @click="onNewChat" />
+                </template>
+            </van-nav-bar>
         </div>
+
+        <!-- 对话历史抽屉 -->
+        <van-popup v-model:show="showHistory" position="right" :style="{ width: '78%', height: '100%' }">
+            <div class="conv-drawer">
+                <div class="conv-drawer-header">
+                    <span class="conv-drawer-title">对话历史</span>
+                    <van-button size="mini" type="primary" plain icon="plus" @click="onNewChat">新对话</van-button>
+                </div>
+                <van-empty v-if="conversations.length === 0" description="暂无对话历史" />
+                <div v-else class="conv-list">
+                    <div
+                        class="conv-item"
+                        :class="{ active: c.id === currentId }"
+                        v-for="c in conversations"
+                        :key="c.id"
+                        @click="onSelectConversation(c.id)"
+                    >
+                        <div class="conv-item-body">
+                            <div class="conv-item-title">{{ c.title }}</div>
+                            <div class="conv-item-time">{{ formatTime(c.updatedAt) }}</div>
+                        </div>
+                        <van-icon name="delete-o" class="conv-item-delete" @click.stop="onDeleteConversation(c)" />
+                    </div>
+                </div>
+            </div>
+        </van-popup>
         <div class="chat-container" ref="chatContainer">
             <div v-if="messages.length === 0" class="chat-empty">
                 <van-empty description="暂无对话记录" />
@@ -40,10 +71,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { fetchStream } from '../utils/request'
-import { showToast } from 'vant'
+import { showToast, showConfirmDialog } from 'vant'
 import ChatBubble from '../components/ChatBubble.vue'
 import { useChatStore } from '../stores/chat'
 import { storeToRefs } from 'pinia'
@@ -51,8 +82,48 @@ import { storeToRefs } from 'pinia'
 const router = useRouter()
 
 const chatStore = useChatStore()
-//对话数据（存于store，切页后保留）
-const { messages } = storeToRefs(chatStore)
+//对话数据（存于store并持久化，每轮对话为一条）
+const { messages, conversations, currentId } = storeToRefs(chatStore)
+
+//对话历史抽屉开关
+const showHistory = ref(false)
+
+//格式化时间戳
+const formatTime = (ts) => {
+    const d = new Date(ts)
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+//新建一轮空白对话（当前已是空白对话则不重复创建）
+const onNewChat = () => {
+    const cur = chatStore.currentConversation
+    if (!cur || cur.messages.length > 0) {
+        chatStore.newConversation()
+    }
+    inputMessage.value = ''
+    showHistory.value = false
+}
+
+//切换到某轮历史对话
+const onSelectConversation = (id) => {
+    chatStore.switchConversation(id)
+    showHistory.value = false
+    nextTick(scrollToBottom)
+}
+
+//删除某轮对话（二次确认）
+const onDeleteConversation = (c) => {
+    showConfirmDialog({
+        title: '删除对话',
+        message: `确定删除「${c.title}」吗？`
+    })
+        .then(() => {
+            chatStore.removeConversation(c.id)
+            showToast('已删除')
+        })
+        .catch(() => {})
+}
 
 //聊天容器
 const chatContainer = ref(null)
@@ -97,22 +168,29 @@ const sendMessage = () => {
     
 }
 
+//单次请求携带的最大历史消息数（控制token）
+const MAX_HISTORY = 20
+
 //获取AI响应
 const fetchAIResponse = (userMsg) => {
     isStreaming.value = true
-    messages.value.push({
+    //本轮之前的历史消息（不含刚添加的用户消息），作为上下文记忆发给后端
+    const history = messages.value
+        .slice(0, -1)
+        .filter(m => m.content && String(m.content).trim())
+        .slice(-MAX_HISTORY)
+        .map(m => ({ role: m.role === 'AI' ? 'assistant' : 'user', content: m.content }))
+    //占位的AI消息，捕获引用以便持续写入（避免切换会话时写错对话）
+    const aiMessage = chatStore.addMessage({
         id: Date.now() + 1,
         role: 'AI',
         content: '',
         timestamp: new Date().toISOString()
     })
     let fullResponse = ''
-    fetchStream('chat', { message: userMsg }, (chunk) => {
+    fetchStream('chat', { message: userMsg, history }, (chunk) => {
         fullResponse += chunk
-        const lastMessage = messages.value[messages.value.length - 1]
-        if(lastMessage && lastMessage.role === 'AI'){
-            lastMessage.content = fullResponse
-        }
+        aiMessage.content = fullResponse
         scrollToBottom()
     }, () => {
         //AI返回完成
@@ -120,10 +198,7 @@ const fetchAIResponse = (userMsg) => {
         scrollToBottom()
     }, (errorMsg) => {
         //AI返回错误
-        const lastMessage = messages.value[messages.value.length - 1]
-        if(lastMessage && lastMessage.role === 'AI'){
-            lastMessage.content = `抱歉，AI发生错误:${errorMsg}`
-        }
+        aiMessage.content = `抱歉，AI发生错误:${errorMsg}`
         isStreaming.value = false
         showToast('AI处理错误，请稍后重试')
         scrollToBottom()
@@ -136,7 +211,7 @@ const onBack = () => {
 
 //用户发送消息
 const addUserMessage = (content) => {
-  messages.value.push({
+  chatStore.addMessage({
     id: Date.now(),
     role: 'user',
     content,
@@ -185,6 +260,78 @@ onMounted(() => {
 }
 :deep(.van-nav-bar .van-icon) {
   color: #fff;
+}
+
+.nav-action {
+  margin-left: 16px;
+  cursor: pointer;
+}
+
+/* 对话历史抽屉 */
+.conv-drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f2f4f8;
+}
+.conv-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #323233;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(31, 45, 61, 0.05);
+}
+.conv-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.conv-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(31, 45, 61, 0.05);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.conv-item:active {
+  transform: translateY(1px);
+}
+.conv-item.active {
+  border: 1px solid #1989fa;
+  background: rgba(25, 137, 250, 0.06);
+}
+.conv-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.conv-item-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #323233;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conv-item-time {
+  font-size: 12px;
+  color: #969799;
+}
+.conv-item-delete {
+  color: #ee0a24;
+  font-size: 18px;
+  padding: 6px;
+  flex-shrink: 0;
 }
 
 .chat-container {

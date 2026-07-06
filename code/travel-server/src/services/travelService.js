@@ -1,5 +1,5 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage,SystemMessage } from '@langchain/core/messages';
+import { HumanMessage,SystemMessage,AIMessage } from '@langchain/core/messages';
 import 'dotenv/config';
 
 class TravelService {
@@ -115,12 +115,23 @@ class TravelService {
 请确保JSON格式正确，可以被解析。`);
     }
 
-    async chat(message,streamCallback){
-        // 流式调用大模型
+    async chat(message,history,streamCallback){
+        // 流式调用大模型（携带历史对话作为上下文记忆）
         const messages = [
-          new SystemMessage('你是一个专业的旅游助手，擅长用中文回答用户关于旅游的问题。'),
-          new HumanMessage(message)
+          new SystemMessage('你是一个专业的旅游助手，擅长用中文回答用户关于旅游的问题。')
         ]
+        //将前几轮对话映射为多轮消息
+        if(Array.isArray(history)){
+          for(const h of history){
+            if(!h || !h.content) continue;
+            if(h.role === 'assistant' || h.role === 'AI'){
+              messages.push(new AIMessage(h.content));
+            }else{
+              messages.push(new HumanMessage(h.content));
+            }
+          }
+        }
+        messages.push(new HumanMessage(message));
         try{
           //调用大模型获取流式响应
           const response = await this.llm.stream(messages);
