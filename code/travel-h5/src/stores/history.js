@@ -28,6 +28,15 @@ export const useHistoryStore = defineStore('history', () => {
     return records.value.find(r => r.key === k)
   }
 
+  //删除一条记录
+  const removeRecord = (key) => {
+    const idx = records.value.findIndex(r => r.key === key)
+    if (idx !== -1) {
+      records.value.splice(idx, 1)
+      persist()
+    }
+  }
+
   //新增/更新一条记录：相同行程去重并置顶
   const addRecord = (city, budget, days, data) => {
     const k = keyOf(city, budget, days)
@@ -49,5 +58,5 @@ export const useHistoryStore = defineStore('history', () => {
     persist()
   }
 
-  return { records, getRecord, addRecord }
+  return { records, getRecord, addRecord, removeRecord }
 })

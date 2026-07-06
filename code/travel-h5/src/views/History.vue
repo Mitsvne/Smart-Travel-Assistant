@@ -32,6 +32,9 @@
             </div>
           </div>
           <van-icon name="arrow" class="item-arrow" />
+          <div class="item-delete" @click.stop="onDelete(record)">
+            <van-icon name="delete-o" />
+          </div>
         </div>
       </div>
     </div>
@@ -41,6 +44,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { showConfirmDialog, showToast } from 'vant'
 import { useHistoryStore } from '../stores/history'
 
 const router = useRouter()
@@ -68,6 +72,19 @@ const goDetail = (record) => {
 
 const goHome = () => {
   router.push('/')
+}
+
+//删除一条历史记录（二次确认）
+const onDelete = (record) => {
+  showConfirmDialog({
+    title: '删除记录',
+    message: `确定删除「${record.city}·${record.days}天行程」吗？`
+  })
+    .then(() => {
+      historyStore.removeRecord(record.key)
+      showToast('已删除')
+    })
+    .catch(() => {})
 }
 
 const onBack = () => {
@@ -175,5 +192,22 @@ const onBack = () => {
   color: #c8c9cc;
   font-size: 16px;
   margin-left: 8px;
+}
+
+.item-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: 4px;
+  border-radius: 50%;
+  color: #ee0a24;
+  font-size: 20px;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.item-delete:active {
+  background: rgba(238, 10, 36, 0.1);
 }
 </style>
