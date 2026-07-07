@@ -1,9 +1,17 @@
 <template>
   <div class="chat-bubble" :class="messageClass">
     <div class="bubble-content">
+      <!-- Agent 推理步骤（仅 AI 消息） -->
+      <AgentSteps v-if="message.role !== 'user' && message.agentSteps && message.agentSteps.length > 0"
+        :steps="message.agentSteps" />
+
       <div class="message-text" v-if="message.role === 'user'">{{ message.content }}</div>
       <div class="message-text ai-message" v-else>
         <template v-if="message.content">{{ message.content }}</template>
+        <template v-else-if="isStreaming">
+          <van-loading type="spinner" size="16" />
+          <span class="streaming-text">AI 正在思考...</span>
+        </template>
       </div>
     </div>
     <div class="message-time" v-if="showTime">{{ formatTime }}</div>
@@ -12,11 +20,16 @@
 
 <script setup>
 import { computed } from 'vue'
+import AgentSteps from './AgentSteps.vue'
 
 const props = defineProps({
   message: {
     type: Object,
     required: true
+  },
+  isStreaming: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -39,7 +52,7 @@ const formatTime = computed(() => {
 .chat-bubble {
   display: flex;
   flex-direction: column;
-  max-width: 80%;
+  max-width: 85%;
 }
 
 .user-message {
@@ -81,9 +94,9 @@ const formatTime = computed(() => {
   padding: 0 4px;
 }
 
-.typing {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.streaming-text {
+  color: #969799;
+  margin-left: 6px;
+  font-size: 14px;
 }
 </style>

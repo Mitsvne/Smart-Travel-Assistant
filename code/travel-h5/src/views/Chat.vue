@@ -6,6 +6,9 @@
              left-text="返回"
               @click-left="onBack">
                 <template #right>
+                    <van-tag :type="useAgentMode ? 'primary' : 'default'" size="mini" @click="useAgentMode = !useAgentMode" style="margin-right:8px;cursor:pointer">
+                        {{ useAgentMode ? 'Agent' : '普通' }}
+                    </van-tag>
                     <van-icon name="notes-o" size="20" class="nav-action" @click="showHistory = true" />
                     <van-icon name="plus" size="20" class="nav-action" @click="onNewChat" />
                 </template>
@@ -48,7 +51,7 @@
                 </div>
             </div>
             <div v-else class="messages-list">
-                <ChatBubble v-for="msg in messages" :key="msg.id" :message="msg" /> 
+                <ChatBubble v-for="msg in messages" :key="msg.id" :message="msg" :isStreaming="isStreaming" /> 
                 <div class="streaming-indicator" v-if="isStreaming">
                     <van-loading type="spinner" size="20px"/>
                     <span>AI正在思考中...</span>
@@ -73,7 +76,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { fetchStream } from '../utils/request'
+import { fetchStream, fetchAgentStream } from '../utils/request'
 import { showToast, showConfirmDialog } from 'vant'
 import ChatBubble from '../components/ChatBubble.vue'
 import { useChatStore } from '../stores/chat'
@@ -154,6 +157,8 @@ const handleClickTag = (q) => {
 const inputMessage = ref('')
 //AI处理中
 const isStreaming = ref(false)
+//Agent 模式开关
+const useAgentMode = ref(true)
 
 //发送消息
 const sendMessage = () => {
@@ -163,15 +168,18 @@ const sendMessage = () => {
     }
     addUserMessage(msg)
     inputMessage.value = ''
-    //运行流式请求yy
-    fetchAIResponse(msg)
-    
+    //根据模式选择接口
+    if (useAgentMode.value) {
+        fetchAgentResponse(msg)
+    } else {
+        fetchAIResponse(msg)
+    }
 }
 
 //单次请求携带的最大历史消息数（控制token）
 const MAX_HISTORY = 20
 
-//获取AI响应
+//获取AI响应（原版，向后兼容）
 const fetchAIResponse = (userMsg) => {
     isStreaming.value = true
     //本轮之前的历史消息（不含刚添加的用户消息），作为上下文记忆发给后端
@@ -185,6 +193,7 @@ const fetchAIResponse = (userMsg) => {
         id: Date.now() + 1,
         role: 'AI',
         content: '',
+        agentSteps: [],
         timestamp: new Date().toISOString()
     })
     let fullResponse = ''
@@ -203,6 +212,92 @@ const fetchAIResponse = (userMsg) => {
         showToast('AI处理错误，请稍后重试')
         scrollToBottom()
     })
+}
+
+//获取Agent响应（新增）
+const fetchAgentResponse = (userMsg) => {
+    isStreaming.value = true
+    //本轮之前的历史消息
+    const history = messages.value
+        .slice(0, -1)
+        .filter(m => m.content && String(m.content).trim())
+        .slice(-MAX_HISTORY)
+        .map(m => ({ role: m.role === 'AI' ? 'assistant' : 'user', content: m.content }))
+    //占位的AI消息
+    const aiMessage = chatStore.addMessage({
+        id: Date.now() + 1,
+        role: 'AI',
+        content: '',
+        agentSteps: [],
+        timestamp: new Date().toISOString()
+    })
+
+    // Agent 步骤追踪
+    const stepMap = new Map() // toolCallId → step
+
+    fetchAgentStream(
+        { message: userMsg, history },
+        {
+            // Agent 思考
+            onThinking: (data) => {
+                const step = {
+                    id: Date.now() + Math.random(),
+                    type: 'thinking',
+                    content: data.content,
+                    node: data.node,
+                    status: 'done',
+                    timestamp: data.timestamp
+                }
+                aiMessage.agentSteps.push(step)
+                scrollToBottom()
+            },
+            // 工具调用开始
+            onToolCall: (data) => {
+                const step = {
+                    id: data.id || (Date.now() + Math.random()),
+                    type: 'tool_call',
+                    tool: data.tool,
+                    args: data.args,
+                    status: 'running',
+                    timestamp: data.timestamp
+                }
+                aiMessage.agentSteps.push(step)
+                stepMap.set(data.id, step)
+                scrollToBottom()
+            },
+            // 工具调用结果
+            onToolResult: (data) => {
+                const step = stepMap.get(data.id)
+                if (step) {
+                    step.status = data.success ? 'done' : 'error'
+                    step.result = data.result
+                    step.duration = data.duration
+                    step.success = data.success
+                }
+                scrollToBottom()
+            },
+            // 流式回复
+            onChunk: (content) => {
+                aiMessage.content += content
+                scrollToBottom()
+            },
+            // 完成
+            onComplete: (data) => {
+                isStreaming.value = false
+                if (!aiMessage.content && data.data?.reply) {
+                    aiMessage.content = data.data.reply
+                }
+                scrollToBottom()
+            },
+            // 错误
+            onError: (errorMsg) => {
+                aiMessage.content = aiMessage.content || `抱歉，Agent处理出错: ${errorMsg}`
+                isStreaming.value = false
+                showToast('Agent处理错误，请稍后重试')
+                scrollToBottom()
+            }
+        }
+    )
 }
 
 const onBack = () => {
