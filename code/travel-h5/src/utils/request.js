@@ -49,20 +49,24 @@ export async function fetchStream(url, data, onChunk, onComplete, onError) {
         })
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
+        let completed = false  // 防止 complete 和 done 事件重复回调
         while (true) {
             const { done, value } = await reader.read()
             if (done) break
             const chunk = decoder.decode(value, { stream: true })
             const lines = chunk.split('\n').filter(line => line.trim())
             for (const line of lines) {
-                console.log(line)
                 try {
                     if (line.startsWith('data: ')) {
                         const jsonStr = line.substring(6)
                         const jsonData = JSON.parse(jsonStr)
                         if (jsonData.type === 'chunk') {
                             onChunk(jsonData.content)
-                        } else if (jsonData.done) {
+                        } else if (jsonData.type === 'complete') {
+                            completed = true
+                            // 传递完整的 data 对象（含 latency）
+                            onComplete(jsonData.data, jsonData.latency)
+                        } else if (jsonData.done && !completed) {
                             onComplete(jsonData.data)
                         } else if (jsonData.error) {
                             onError(jsonData.error)

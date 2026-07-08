@@ -15,7 +15,12 @@ function routeAfterAgent(state) {
     return 'finalize';
   }
 
-  // agent 节点已决定需要最终回复
+  // ★ agent 节点已生成完整回复（无工具调用）→ 直接结束，跳过 finalize
+  if (status === 'complete') {
+    return 'end';
+  }
+
+  // agent 节点已决定需要最终回复（有工具调用已完成）→ finalize
   if (status === 'finalizing') {
     return 'finalize';
   }
@@ -44,10 +49,12 @@ function routeAfterTools(state) {
 /**
  * 构建 Agent StateGraph
  *
- * 图结构:
+ * ★ 优化后的图结构:
  *   START → agent ──(有 tool_calls)──→ tools ──→ agent (循环)
  *               │                                    │
- *               └──(无 tool_calls 或超限)──→ finalize → END
+ *               ├──(无 tool_calls)──→ END (跳过 finalize，流式已输出)
+ *               │                                    │
+ *               └──(工具完成 或 超限)──→ finalize → END
  */
 export function buildAgentGraph() {
   const workflow = new StateGraph(AgentState)
@@ -62,7 +69,8 @@ export function buildAgentGraph() {
     // agent 节点的条件路由
     .addConditionalEdges('agent', routeAfterAgent, {
       tools: 'tools',
-      finalize: 'finalize'
+      finalize: 'finalize',
+      end: END       // ★ 无工具调用：直接流式输出完毕，跳过 finalize
     })
 
     // 工具执行后条件路由

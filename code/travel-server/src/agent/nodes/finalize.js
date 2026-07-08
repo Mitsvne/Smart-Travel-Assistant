@@ -4,13 +4,38 @@ import { FINALIZER_PROMPT } from '../prompts/synthesizer.js';
 /**
  * Finalize 节点
  * 综合所有工具结果和对话历史，生成最终回复
- * 此节点将消息转为纯文本上下文（避免 tool_call/tool_message 配对问题）
+ *
+ * ★ 性能优化：如果 agent 已生成文本内容且无工具调用结果，
+ *   直接转发（模拟流式），跳过二次 LLM 调用。
  */
 export async function finalizeNode(state, config) {
-  const { messages, userMessage, toolResults, error } = state;
+  const { messages, userMessage, toolResults, error, finalResponse } = state;
   const llm = config.configurable.llm;
 
   const events = [];
+
+  // ── ★ 快速路径：agent 已生成完整回复，直接转发 ──
+  if (finalResponse && (!toolResults || toolResults.length === 0)) {
+    // 模拟流式输出：按字符分批发送，保持前端流式体验
+    const content = finalResponse;
+    const chunkSize = 3; // 每次发送 3 个字符
+    for (let i = 0; i < content.length; i += chunkSize) {
+      events.push({
+        type: 'agent/chunk',
+        content: content.slice(i, i + chunkSize)
+      });
+    }
+    events.push({
+      type: 'agent/done',
+      finalResponse: content
+    });
+    return {
+      messages: [new AIMessage({ content })],
+      finalResponse: content,
+      status: 'complete',
+      streamEvents: events
+    };
+  }
 
   // 收集工具结果摘要
   const toolResultsText = toolResults.length > 0

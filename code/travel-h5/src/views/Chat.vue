@@ -52,10 +52,6 @@
             </div>
             <div v-else class="messages-list">
                 <ChatBubble v-for="msg in messages" :key="msg.id" :message="msg" :isStreaming="isStreaming" /> 
-                <div class="streaming-indicator" v-if="isStreaming">
-                    <van-loading type="spinner" size="20px"/>
-                    <span>AI正在思考中...</span>
-                </div>
             </div>
         </div>
         <div class="chat-input-area">
@@ -182,6 +178,15 @@ const MAX_HISTORY = 20
 //获取AI响应（原版，向后兼容）
 const fetchAIResponse = (userMsg) => {
     isStreaming.value = true
+
+    // ── 客户端延迟计时 ──
+    const clientTiming = {
+        sendTime: performance.now(),
+        firstChunkTime: null,
+        completeTime: null,
+        chunkCount: 0
+    }
+
     //本轮之前的历史消息（不含刚添加的用户消息），作为上下文记忆发给后端
     const history = messages.value
         .slice(0, -1)
@@ -198,12 +203,40 @@ const fetchAIResponse = (userMsg) => {
     })
     let fullResponse = ''
     fetchStream('chat', { message: userMsg, history }, (chunk) => {
+        // ── 记录首 token ──
+        if (!clientTiming.firstChunkTime) {
+            clientTiming.firstChunkTime = performance.now()
+        }
+        clientTiming.chunkCount++
         fullResponse += chunk
         aiMessage.content = fullResponse
         scrollToBottom()
-    }, () => {
+    }, (data, serverLatency) => {
         //AI返回完成
+        clientTiming.completeTime = performance.now()
         isStreaming.value = false
+
+        // ── 输出延迟报告 ──
+        const report = {
+            mode: '普通',
+            userMessage: userMsg.slice(0, 60),
+            serverLatency: serverLatency || null,
+            client: {
+                ttftMs: clientTiming.firstChunkTime
+                    ? Math.round(clientTiming.firstChunkTime - clientTiming.sendTime)
+                    : null,
+                totalMs: Math.round(clientTiming.completeTime - clientTiming.sendTime),
+                chunkCount: clientTiming.chunkCount,
+                timestamp: new Date().toISOString()
+            }
+        }
+        console.log(
+            '%c⏱ 普通模式延迟报告 %c[点击展开]',
+            'font-weight:bold;color:#07c160',
+            'color:#999;font-size:11px',
+            report
+        )
+
         scrollToBottom()
     }, (errorMsg) => {
         //AI返回错误
@@ -217,6 +250,17 @@ const fetchAIResponse = (userMsg) => {
 //获取Agent响应（新增）
 const fetchAgentResponse = (userMsg) => {
     isStreaming.value = true
+
+    // ── 客户端延迟计时 ──
+    const clientTiming = {
+        sendTime: performance.now(),      // 浏览器发送时间
+        firstChunkTime: null,             // 首个 token 到达时间
+        firstThinkingTime: null,          // 首次思考事件到达
+        firstToolCallTime: null,          // 首次工具调用
+        completeTime: null,               // 完成时间
+        chunkCount: 0
+    }
+
     //本轮之前的历史消息
     const history = messages.value
         .slice(0, -1)
@@ -240,6 +284,9 @@ const fetchAgentResponse = (userMsg) => {
         {
             // Agent 思考
             onThinking: (data) => {
+                if (!clientTiming.firstThinkingTime) {
+                    clientTiming.firstThinkingTime = performance.now()
+                }
                 const step = {
                     id: Date.now() + Math.random(),
                     type: 'thinking',
@@ -253,6 +300,9 @@ const fetchAgentResponse = (userMsg) => {
             },
             // 工具调用开始
             onToolCall: (data) => {
+                if (!clientTiming.firstToolCallTime) {
+                    clientTiming.firstToolCallTime = performance.now()
+                }
                 const step = {
                     id: data.id || (Date.now() + Math.random()),
                     type: 'tool_call',
@@ -278,19 +328,55 @@ const fetchAgentResponse = (userMsg) => {
             },
             // 流式回复
             onChunk: (content) => {
+                // ── 记录首 token 时间 ──
+                if (!clientTiming.firstChunkTime) {
+                    clientTiming.firstChunkTime = performance.now()
+                }
+                clientTiming.chunkCount++
                 aiMessage.content += content
                 scrollToBottom()
             },
             // 完成
             onComplete: (data) => {
+                clientTiming.completeTime = performance.now()
                 isStreaming.value = false
                 if (!aiMessage.content && data.data?.reply) {
                     aiMessage.content = data.data.reply
                 }
+
+                // ── 输出延迟报告到控制台 ──
+                const report = {
+                    userMessage: userMsg.slice(0, 60),
+                    // 服务端数据
+                    serverLatency: data.data?.latency || null,
+                    // 客户端数据
+                    client: {
+                        ttftMs: clientTiming.firstChunkTime
+                            ? Math.round(clientTiming.firstChunkTime - clientTiming.sendTime)
+                            : null,
+                        thinkingMs: clientTiming.firstThinkingTime
+                            ? Math.round(clientTiming.firstThinkingTime - clientTiming.sendTime)
+                            : null,
+                        firstToolMs: clientTiming.firstToolCallTime
+                            ? Math.round(clientTiming.firstToolCallTime - clientTiming.sendTime)
+                            : null,
+                        totalMs: Math.round(clientTiming.completeTime - clientTiming.sendTime),
+                        chunkCount: clientTiming.chunkCount,
+                        timestamp: new Date().toISOString()
+                    }
+                }
+                console.log(
+                    '%c⏱ Agent 延迟报告 %c[点击展开]',
+                    'font-weight:bold;color:#1989fa',
+                    'color:#999;font-size:11px',
+                    report
+                )
+
                 scrollToBottom()
             },
             // 错误
             onError: (errorMsg) => {
+                clientTiming.completeTime = performance.now()
                 aiMessage.content = aiMessage.content || `抱歉，Agent处理出错: ${errorMsg}`
                 isStreaming.value = false
                 showToast('Agent处理错误，请稍后重试')
@@ -471,15 +557,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.streaming-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  color: #969799;
-  font-size: 14px;
 }
 
 .chat-input-area {

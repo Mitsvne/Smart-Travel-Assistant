@@ -6,6 +6,7 @@ import { compileAgentGraph } from '../agent/graph.js';
 import { TOOLS } from '../agent/tools/registry.js';
 import { getKnowledgeRetriever } from '../agent/memory/knowledge.js';
 import { createAgentStreamResponse } from '../utils/agentStreamUtils.js';
+import { createTrace, markAgentThink, markToolCallStart, markToolCallEnd, markFirstToken, markDone, getRecentRecords, getLatencyStats, clearRecords } from '../utils/latencyTracker.js';
 import 'dotenv/config';
 
 const router = express.Router();
@@ -69,6 +70,9 @@ router.post('/agent', async (req, res) => {
   try {
     // 初始化
     const threadId = clientThreadId || `thread_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // ── 延迟追踪：创建 trace ──
+    const trace = createTrace(threadId, message);
     const llm = createLLM();
     const checkpointer = getCheckpointer(threadId);
 
@@ -119,6 +123,9 @@ router.post('/agent', async (req, res) => {
       }
     );
 
+    let firstTokenMarked = false;
+    let chunkCount = 0;
+
     for await (const chunk of graphStream) {
       lastState = chunk;
 
@@ -127,18 +134,36 @@ router.post('/agent', async (req, res) => {
         const newEvents = chunk.streamEvents.slice(sentEventCount);
         sentEventCount = chunk.streamEvents.length;
         for (const event of newEvents) {
+          // ── 延迟追踪：各阶段计时 ──
+          if (event.type === 'agent/thinking') {
+            markAgentThink(threadId, event.content);
+          } else if (event.type === 'agent/tool_call') {
+            markToolCallStart(threadId, event.tool, event.args);
+          } else if (event.type === 'agent/tool_result') {
+            markToolCallEnd(threadId, event.tool, event.success, event.duration);
+          } else if (event.type === 'agent/chunk') {
+            if (!firstTokenMarked) {
+              firstTokenMarked = true;
+              markFirstToken(threadId);
+            }
+            chunkCount++;
+          }
           stream.sendEvent(event);
         }
       }
     }
 
-    // 发送完成事件
+    // ── 延迟追踪：完成 ──
+    const summary = markDone(threadId);
+
+    // 发送完成事件（附带延迟数据）
     const finalResponse = lastState?.finalResponse || '';
     stream.sendDone({
       reply: finalResponse,
       threadId,
       status: lastState?.status || 'complete',
-      toolResults: lastState?.toolResults || []
+      toolResults: lastState?.toolResults || [],
+      latency: summary  // 附带服务端延迟数据，前端可展示
     });
     stream.end();
   } catch (err) {
@@ -166,6 +191,44 @@ router.get('/agent/status', (req, res) => {
     activeCheckpoints: checkpointers.size,
     timestamp: new Date().toISOString()
   });
+});
+
+/**
+ * GET /api/travel/agent/latency-stats
+ * 获取 Agent 延迟统计（聚合数据）
+ */
+router.get('/agent/latency-stats', (req, res) => {
+  const stats = getLatencyStats();
+  res.json({
+    success: true,
+    data: stats,
+    note: stats
+      ? '统计基于最近 100 条已完成请求。TTFT = 服务端收到请求 → 首个 LLM token 输出的时间。'
+      : '暂无数据，请先发起 Agent 请求。'
+  });
+});
+
+/**
+ * GET /api/travel/agent/latency-records
+ * 获取最近 N 条延迟明细
+ */
+router.get('/agent/latency-records', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 20, 200);
+  const records = getRecentRecords(limit);
+  res.json({
+    success: true,
+    count: records.length,
+    data: records
+  });
+});
+
+/**
+ * DELETE /api/travel/agent/latency-records
+ * 清空延迟记录
+ */
+router.delete('/agent/latency-records', (req, res) => {
+  clearRecords();
+  res.json({ success: true, message: '延迟记录已清空' });
 });
 
 export default router;
