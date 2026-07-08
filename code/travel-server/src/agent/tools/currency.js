@@ -1,5 +1,6 @@
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { recordCacheAccess } from '../../utils/cacheTracker.js';
 
 /**
  * 汇率换算工具
@@ -37,9 +38,11 @@ const CURRENCY_NAMES = {
 async function getRates(base = 'CNY') {
   const now = Date.now();
   if (cache && cache.base === base && (now - cacheTime) < CACHE_TTL) {
+    recordCacheAccess('currency_rates', true, 0, base);
     return cache;
   }
 
+  const fetchStart = Date.now();
   try {
     const url = `https://api.frankfurter.app/latest?from=${base}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
@@ -52,6 +55,7 @@ async function getRates(base = 'CNY') {
       rates: data.rates
     };
     cacheTime = now;
+    recordCacheAccess('currency_rates', false, Date.now() - fetchStart, base);
     return cache;
   } catch (err) {
     // 如果 API 不可用，返回常用参考汇率

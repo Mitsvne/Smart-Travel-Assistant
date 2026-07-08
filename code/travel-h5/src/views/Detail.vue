@@ -110,20 +110,30 @@ const errorMsg = ref('')
 const fetchTravelData=async()=>{
   isLoading.value = true
   errorMsg.value = ''
+  const apiStartTime = performance.now()
   try {
     const res = await post('recommend', {
       city: formData.city,
       budget: formData.budget,
       days: formData.days
     })
+    const apiDuration = performance.now() - apiStartTime
     if(res && res.success != false){
       tripData.value = res
       historyStore.addRecord(formData.city, formData.budget, formData.days, res)
+      console.log(
+        '%c🌐 API 请求完成 %c耗时: %.0fms %c→ 已写入缓存',
+        'color:#1989fa;font-weight:bold',
+        'color:#999',
+        apiDuration,
+        'color:#07c160'
+      )
     }else{
       errorMsg.value = '接口调用失败'
     }
   } catch (e) {
     errorMsg.value = '接口调用失败'
+    console.log('%c🌐 API 请求失败 %c耗时: %.0fms', 'color:#ee0a24', 'color:#999', performance.now() - apiStartTime)
   } finally {
     isLoading.value = false
   }
@@ -135,11 +145,30 @@ onMounted(() => {
   formData.budget = route.query.budget
   formData.days = route.query.days
   if(formData.city && formData.budget && formData.days) {
+    const cacheCheckStart = performance.now()
     const cached = historyStore.getRecord(formData.city, formData.budget, formData.days)
     if(cached){
+      // ── 缓存命中 ──
+      const cacheHitDuration = performance.now() - cacheCheckStart
       tripData.value = cached.data
       isLoading.value = false
+      console.log(
+        '%c⚡ 缓存命中，跳过 API 调用 %c耗时: %.2fms %c(对比 API 调用通常需 5-15s)',
+        'color:#07c160;font-weight:bold',
+        'color:#999',
+        cacheHitDuration,
+        'color:#999'
+      )
     }else{
+      // ── 缓存未命中 ──
+      const cacheMissDuration = performance.now() - cacheCheckStart
+      console.log(
+        '%c❌ 缓存未命中 %c查询耗时: %.2fms %c→ 发起 API 请求...',
+        'color:#ff976a;font-weight:bold',
+        'color:#999',
+        cacheMissDuration,
+        'color:#999'
+      )
       fetchTravelData()
     }
   }

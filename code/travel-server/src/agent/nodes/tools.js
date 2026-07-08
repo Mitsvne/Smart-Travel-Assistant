@@ -1,10 +1,14 @@
 import { ToolMessage, HumanMessage } from '@langchain/core/messages';
 import { toolByName } from '../tools/registry.js';
 import { TOOL_TIMEOUT_MS } from '../state.js';
+import { getCachedToolResult, setCachedToolResult, previewKey } from '../../utils/toolCache.js';
 
 /**
  * 工具执行节点
  * 执行 LLM 请求的 tool_calls，返回 ToolMessage 数组
+ *
+ * ★ 缓存优化：调用工具前先查 MD5 哈希缓存，命中则跳过 API 调用。
+ *   天气/POI/汇率等工具的结果在 TTL 内直接复用。
  *
  * 并行执行多个工具调用，单个失败不影响其他
  */
@@ -54,12 +58,54 @@ export async function toolsNode(state, config) {
       };
     }
 
+    // ── ★ 缓存查询 ──
+    const cacheKey = previewKey(toolCall.name, toolCall.args);
+    const cached = getCachedToolResult(toolCall.name, toolCall.args);
+    if (cached !== null) {
+      const duration = Date.now() - startTime;
+      const truncated = cached.length > 4000
+        ? cached.slice(0, 4000) + '...(结果已截断)'
+        : cached;
+
+      console.log(`  [Cache HIT] ${toolCall.name}#${cacheKey} (${duration}ms)`);
+
+      toolResults.push({
+        tool: toolCall.name,
+        args: toolCall.args,
+        result: truncated,
+        success: true,
+        duration,
+        fromCache: true
+      });
+
+      events.push({
+        type: 'agent/tool_result',
+        tool: toolCall.name,
+        id: toolCall.id,
+        result: truncated.slice(0, 500),
+        success: true,
+        duration,
+        fromCache: true
+      });
+
+      return {
+        toolCallId: toolCall.id,
+        content: truncated,
+        success: true,
+        fromCache: true
+      };
+    }
+
+    // ── 缓存未命中，执行工具 ──
+    console.log(`  [Cache MISS] ${toolCall.name}#${cacheKey}`);
     try {
       const result = await tool.invoke(toolCall.args);
       const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
       const duration = Date.now() - startTime;
 
-      // 限制工具结果长度，避免 token 超限
+      // 写入缓存
+      setCachedToolResult(toolCall.name, toolCall.args, resultStr);
+
       const truncated = resultStr.length > 4000
         ? resultStr.slice(0, 4000) + '...(结果已截断)'
         : resultStr;
@@ -76,7 +122,7 @@ export async function toolsNode(state, config) {
         type: 'agent/tool_result',
         tool: toolCall.name,
         id: toolCall.id,
-        result: truncated.slice(0, 500), // SSE 中给摘要
+        result: truncated.slice(0, 500),
         success: true,
         duration
       });
