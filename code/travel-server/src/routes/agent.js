@@ -8,6 +8,7 @@ import { getKnowledgeRetriever } from '../agent/memory/knowledge.js';
 import { createAgentStreamResponse } from '../utils/agentStreamUtils.js';
 import { createTrace, markAgentThink, markToolCallStart, markToolCallEnd, markFirstToken, markDone, getRecentRecords, getLatencyStats, clearRecords } from '../utils/latencyTracker.js';
 import { getToolCacheStats, clearToolCache } from '../utils/toolCache.js';
+import { getToolSuccessStats, clearToolStats } from '../utils/toolStats.js';
 import 'dotenv/config';
 
 const router = express.Router();
@@ -248,6 +249,24 @@ router.get('/agent/tool-cache-stats', (req, res) => {
 router.delete('/agent/tool-cache', (req, res) => {
   clearToolCache();
   res.json({ success: true, message: '工具缓存已清空' });
+});
+
+/**
+ * GET /api/travel/agent/tool-success-stats
+ * 获取工具调用成功率统计
+ */
+router.get('/agent/tool-success-stats', (req, res) => {
+  const stats = getToolSuccessStats();
+  res.json({ success: true, data: stats });
+});
+
+/**
+ * DELETE /api/travel/agent/tool-success-stats
+ * 清空工具调用统计
+ */
+router.delete('/agent/tool-success-stats', (req, res) => {
+  clearToolStats();
+  res.json({ success: true, message: '工具统计已清空' });
 });
 
 export default router;

@@ -2,6 +2,7 @@ import { ToolMessage, HumanMessage } from '@langchain/core/messages';
 import { toolByName } from '../tools/registry.js';
 import { TOOL_TIMEOUT_MS } from '../state.js';
 import { getCachedToolResult, setCachedToolResult, previewKey } from '../../utils/toolCache.js';
+import { recordToolSuccess, recordToolFailure } from '../../utils/toolStats.js';
 
 /**
  * 工具执行节点
@@ -42,6 +43,7 @@ export async function toolsNode(state, config) {
     });
 
     if (!tool) {
+      recordToolFailure(toolCall.name);
       const errMsg = `未知工具: ${toolCall.name}`;
       events.push({
         type: 'agent/tool_result',
@@ -62,6 +64,7 @@ export async function toolsNode(state, config) {
     const cacheKey = previewKey(toolCall.name, toolCall.args);
     const cached = getCachedToolResult(toolCall.name, toolCall.args);
     if (cached !== null) {
+      recordToolSuccess(toolCall.name);
       const duration = Date.now() - startTime;
       const truncated = cached.length > 4000
         ? cached.slice(0, 4000) + '...(结果已截断)'
@@ -105,6 +108,7 @@ export async function toolsNode(state, config) {
 
       // 写入缓存
       setCachedToolResult(toolCall.name, toolCall.args, resultStr);
+      recordToolSuccess(toolCall.name);
 
       const truncated = resultStr.length > 4000
         ? resultStr.slice(0, 4000) + '...(结果已截断)'
@@ -133,6 +137,7 @@ export async function toolsNode(state, config) {
         success: true
       };
     } catch (err) {
+      recordToolFailure(toolCall.name);
       const duration = Date.now() - startTime;
       const errMsg = `工具执行失败: ${err.message}`;
 
